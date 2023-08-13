@@ -1,0 +1,180 @@
+package package1;
+
+import javax.swing.*;
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.PriorityQueue;
+
+public class MazeSolverAlgorithm {
+
+    private int startX;
+    private int startY;
+    private int endX;
+    private int endY;
+
+   
+    private int obstacleCount;
+
+  
+    private JLabel[][] labels;
+    private int x;
+    private int y;
+
+    public MazeSolverAlgorithm(JLabel[][] labels, int x, int y) {
+        this.labels = labels;
+        this.x = x;
+        this.y = y;
+
+        JOptionPane.showMessageDialog(null, "Labirent üzerinde Başlangıç ve Bitiş noktalarını belirlemek için labirente tıklayın.\n" +
+                "Başlangıç noktası için sol tık (Yeşil renk).\n" +
+                "Bitiş noktası için sağ tık (Kırmızı renk).\n" +
+                "Başlangıç ve Bitiş noktalarını belirledikten sonra engeller eklemek için hücrelere tıklayın (Siyah renk).\n" +
+                "Devam etmek için Tamam butonuna tıklayın.");
+
+       
+        for (int i = 0; i < x; i++) {
+            for (int j = 0; j < y; j++) {
+                labels[i][j].addMouseListener(new java.awt.event.MouseAdapter() {
+                    public void mouseClicked(java.awt.event.MouseEvent evt) {
+                        if (SwingUtilities.isLeftMouseButton(evt)) {
+                            // Başlangıç noktasını belirle (Yeşil renk)
+                            if (startX == -1 && startY == -1) {
+                                startX = i;
+                                startY = j;
+                                labels[i][j].setBackground(Color.GREEN);
+                            }
+                        } else if (SwingUtilities.isRightMouseButton(evt)) {
+                          
+                            if (endX == -1 && endY == -1) {
+                                endX = i;
+                                endY = j;
+                                labels[i][j].setBackground(Color.RED);
+
+                               
+                                JOptionPane.showMessageDialog(null, "Şimdi engeller eklemek için hücrelere tıklayın (Siyah renk).\n" +
+                                        "Engelleri ekledikten sonra en kısa yolu bulmak için Tamam butonuna tıklayın.");
+                            }
+                        } else {
+                          
+                            if (startX != -1 && startY != -1 && endX != -1 && endY != -1) {
+                                if (!labels[i][j].getBackground().equals(Color.GREEN) &&
+                                        !labels[i][j].getBackground().equals(Color.RED)) {
+                                    labels[i][j].setBackground(Color.BLACK);
+                                    obstacleCount++;
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        
+        JOptionPane.showMessageDialog(null, "En kısa yolu bulmak için Tamam butonuna tıklayın.");
+
+        
+        findShortestPathAStar();
+    }
+
+    // A* algoritması 
+    private void findShortestPathAStar() {
+  
+        Comparator<int[]> comparator = (o1, o2) -> (o1[2] + o1[3]) - (o2[2] + o2[3]);
+
+        // Açık ve kapalı kümeleri başlat
+        HashSet<String> closedSet = new HashSet<>();
+        PriorityQueue<int[]> openSet = new PriorityQueue<>(comparator);
+
+        // Labirentte her hücrenin ebeveynini takip etmek için  dizi oluşturdum
+        int[][][] cameFrom = new int[x][y][2];
+        for (int i = 0; i < x; i++) {
+            for (int j = 0; j < y; j++) {
+                cameFrom[i][j] = new int[]{-1, -1};
+            }
+        }
+
+        // "gScore", başlangıç noktasından her hücreye olan maliyeti takip etmek için kullanılır
+        int[][] gScore = new int[x][y];
+        for (int i = 0; i < x; i++) {
+            for (int j = 0; j < y; j++) {
+                gScore[i][j] = Integer.MAX_VALUE;
+            }
+        }
+        gScore[startX][startY] = 0;
+
+        // "fScore", başlangıç noktasından hedefe olan toplam tahmini maliyeti takip etmek için kullanılır
+        int[][] fScore = new int[x][y];
+        for (int i = 0; i < x; i++) {
+            for (int j = 0; j < y; j++) {
+                fScore[i][j] = Integer.MAX_VALUE;
+            }
+        }
+        fScore[startX][startY] = heuristic(startX, startY);
+
+        // Başlangıç hücresini açık kümeye ekle
+        openSet.add(new int[]{startX, startY, gScore[startX][startY], fScore[startX][startY]});
+
+        // A* algoritması
+        while (!openSet.isEmpty()) {
+            int[] current = openSet.poll();
+            int currentX = current[0];
+            int currentY = current[1];
+
+            if (currentX == endX && currentY == endY) {
+                // Hedef noktaya ulaşıldı, yolu yeniden oluştur ve hücreleri mavi renkte işaretle
+                reconstructPath(cameFrom);
+                return;
+            }
+
+            closedSet.add(currentX + "," + currentY);
+
+            // Komşu hücreleri keşfet
+            for (int i = 0; i < 4; i++) {
+                int nextX = currentX + dx[i];
+                int nextY = currentY + dy[i];
+
+                // Sonraki hücrenin labirent sınırları içinde olduğunu ve engel olmadığını kontrol et
+                if (nextX >= 0 && nextX < x && nextY >= 0 && nextY < y
+                        && !labels[nextX][nextY].getBackground().equals(Color.BLACK)) {
+                    int tentativeGScore = gScore[currentX][currentY] + 1;
+
+                    if (tentativeGScore < gScore[nextX][nextY]) {
+                        // Bu hücreye olan yol daha önceki yollardan daha iyiyse güncelle
+                        cameFrom[nextX][nextY] = new int[]{currentX, currentY};
+                        gScore[nextX][nextY] = tentativeGScore;
+                        fScore[nextX][nextY] = gScore[nextX][nextY] + heuristic(nextX, nextY);
+
+                        if (!closedSet.contains(nextX + "," + nextY)) {
+                            // Sonraki hücreyi açık kümeye ekle
+                            openSet.add(new int[]{nextX, nextY, gScore[nextX][nextY], fScore[nextX][nextY]});
+                        }
+                    }
+                }
+            }
+        }
+
+        // Hiçbir yol bulunamadı
+        JOptionPane.showMessageDialog(null, "Hiçbir yol bulunamadı!");
+    }
+
+    // Manhattan uzaklığını hesaplamak için metot
+    private int heuristic(int x, int y) {
+        return Math.abs(x - endX) + Math.abs(y - endY);
+    }
+
+    // Başlangıçtan bitişe yolun yeniden oluşturulması için yardımcı metot
+    private void reconstructPath(int[][][] cameFrom) {
+        int currentX = endX;
+        int currentY = endY;
+
+       
+        while (currentX != startX || currentY != startY) {
+            labels[currentX][currentY].setBackground(Color.CYAN);
+            int[] parent = cameFrom[currentX][currentY];
+            currentX = parent[0];
+            currentY = parent[1];
+        }
+    }
+}
